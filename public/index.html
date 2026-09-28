@@ -70,10 +70,6 @@
       cursor: pointer;
     }
 
-    button:active {
-      transform: scale(.98);
-    }
-
     .status {
       margin-top: 18px;
       color: #aeb6c5;
@@ -101,6 +97,7 @@
     .moment h3 {
       margin: 0 0 12px;
       font-size: 18px;
+      line-height: 1.35;
     }
 
     .time {
@@ -167,86 +164,7 @@
         ✨ Momen yang ditemukan
       </div>
 
-      <div class="moment">
-
-        <h3>
-          1. Late Night Melancholy / Curhat Serius
-        </h3>
-
-        <div class="time">
-          ⏱ 15:30 – 18:00
-        </div>
-
-        <div class="description">
-          Curhatan larut malam yang berpotensi
-          menarik perhatian penonton.
-        </div>
-
-        <div class="reason">
-          💡 Alasan menarik: percakapan yang
-          lebih personal dan emosional biasanya
-          memiliki potensi engagement tinggi.
-        </div>
-
-        <button class="clip-btn">
-          ✂️ Buat Clip
-        </button>
-
-      </div>
-
-
-      <div class="moment">
-
-        <h3>
-          2. Momen Lucu / Reaksi Spontan
-        </h3>
-
-        <div class="time">
-          ⏱ 05:00 – 06:20
-        </div>
-
-        <div class="description">
-          Momen spontan dengan reaksi yang
-          menarik untuk dijadikan short video.
-        </div>
-
-        <div class="reason">
-          💡 Alasan menarik: ekspresi dan reaksi
-          spontan mudah menarik perhatian.
-        </div>
-
-        <button class="clip-btn">
-          ✂️ Buat Clip
-        </button>
-
-      </div>
-
-
-      <div class="moment">
-
-        <h3>
-          3. Pernyataan yang Menarik
-        </h3>
-
-        <div class="time">
-          ⏱ 28:40 – 30:10
-        </div>
-
-        <div class="description">
-          Bagian percakapan yang memiliki
-          pernyataan cukup menarik.
-        </div>
-
-        <div class="reason">
-          💡 Alasan menarik: bagian ini dapat
-          memancing komentar dan diskusi.
-        </div>
-
-        <button class="clip-btn">
-          ✂️ Buat Clip
-        </button>
-
-      </div>
+      <div id="moment-list"></div>
 
     </div>
 
@@ -261,38 +179,114 @@
 
 <script>
 
-function analyzeVideo() {
+const moments = [
 
-  const url = document.getElementById("url").value.trim();
+  [
+    "Momen Lucu / Reaksi Spontan",
+    "00:45 – 01:30",
+    "Reaksi spontan yang cukup menarik dan bisa berdiri sebagai video pendek.",
+    "Ekspresi spontan sering membuat sebuah potongan video terasa lebih natural."
+  ],
 
-  const status = document.getElementById("status");
+  [
+    "Pernyataan Menarik",
+    "02:15 – 03:05",
+    "Ada pernyataan yang cukup menarik untuk dipisahkan menjadi sebuah clip.",
+    "Kalimat seperti ini dapat membuat penonton ingin mengetahui konteks selanjutnya."
+  ],
 
-  const results = document.getElementById("results");
+  [
+    "Cerita Singkat",
+    "04:20 – 05:40",
+    "Bagian ketika pembicara mulai menceritakan sebuah pengalaman.",
+    "Cerita personal dapat menjadi potongan yang mudah diikuti."
+  ],
 
-  if (!url) {
+  [
+    "Momen Reaksi",
+    "06:10 – 06:55",
+    "Terjadi reaksi spontan terhadap sesuatu yang dibicarakan.",
+    "Reaksi pendek juga dapat digunakan sebagai short video."
+  ],
 
-    status.textContent =
-      "⚠️ Tempel URL video terlebih dahulu.";
+  [
+    "Kalimat Penting",
+    "07:30 – 08:20",
+    "Terdapat kalimat yang dapat menjadi inti sebuah pembahasan.",
+    "Potongan dengan satu gagasan jelas lebih mudah dipahami penonton."
+  ],
 
-    return;
-  }
+  [
+    "Momen Santai",
+    "09:05 – 09:50",
+    "Percakapan ringan dengan suasana yang lebih santai.",
+    "Tidak semua clip harus serius; percakapan ringan juga bisa menarik."
+  ],
 
-  status.textContent =
-    "⏳ Menganalisis video...";
+  [
+    "Pertanyaan Menarik",
+    "10:15 – 11:05",
+    "Muncul sebuah pertanyaan yang menarik untuk dibahas.",
+    "Pertanyaan dapat membuat penonton ikut berpikir atau berkomentar."
+  ],
 
-  results.style.display = "none";
+  [
+    "Jawaban Menarik",
+    "12:00 – 13:10",
+    "Jawaban yang cukup jelas terhadap topik yang sedang dibicarakan.",
+    "Jawaban yang berdiri sendiri dapat menjadi clip informatif."
+  ],
 
-  setTimeout(() => {
+  [
+    "Momen Emosional",
+    "14:25 – 15:30",
+    "Suasana percakapan berubah menjadi lebih personal dan emosional.",
+    "Perubahan suasana dapat membuat sebuah bagian terasa lebih kuat."
+  ],
 
-    status.textContent =
-      "✅ Analisis selesai.";
+  [
+    "Pendapat Pribadi",
+    "16:40 – 17:30",
+    "Pembicara menyampaikan pendapat atau sudut pandangnya.",
+    "Pendapat pribadi sering membuka ruang diskusi di kolom komentar."
+  ],
 
-    results.style.display = "block";
+  [
+    "Momen Tidak Terduga",
+    "18:10 – 19:00",
+    "Ada perubahan atau kejadian yang tidak terlalu terduga dalam percakapan.",
+    "Perubahan mendadak dapat membuat penonton penasaran."
+  ],
 
-  }, 1200);
-}
+  [
+    "Fakta / Informasi",
+    "20:20 – 21:25",
+    "Bagian yang berisi informasi atau fakta yang bisa berdiri sendiri.",
+    "Informasi singkat cocok dijadikan konten pendek."
+  ],
 
-</script>
+  [
+    "Interaksi Menarik",
+    "22:15 – 23:10",
+    "Interaksi antara pembicara menghasilkan percakapan yang menarik.",
+    "Interaksi biasanya terasa lebih hidup dibanding monolog."
+  ],
 
-</body>
-</html>
+  [
+    "Pernyataan Kontroversial",
+    "25:30 – 26:30",
+    "Ada pernyataan yang berpotensi memancing pendapat berbeda.",
+    "Topik yang memancing diskusi dapat menghasilkan komentar."
+  ],
+
+  [
+    "Penutup yang Menarik",
+    "28:40 – 30:10",
+    "Bagian akhir pembahasan yang dapat menjadi penutup sebuah clip.",
+    "Penutup yang jelas membuat potongan video terasa lebih lengkap."
+  ]
+
+];
+
+
+function analyze
