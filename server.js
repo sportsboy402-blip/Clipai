@@ -14,123 +14,187 @@ const DATA = path.join(__dirname, "data");
 const UPLOADS = path.join(DATA, "uploads");
 const OUTPUTS = path.join(DATA, "outputs");
 
-[DATA, UPLOADS, OUTPUTS].forEach((d) => {
-  fs.mkdirSync(d, { recursive: true });
-});
+for (const dir of [DATA, UPLOADS, OUTPUTS]) {
+  fs.mkdirSync(dir, { recursive: true });
+}
 
 const upload = multer({
   dest: UPLOADS,
-  limits: { fileSize: 500 * 1024 * 1024 }
+  limits: {
+    fileSize: 500 * 1024 * 1024
+  }
 });
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/api/health", (_, res) => {
+
+/* =========================
+   HEALTH CHECK
+========================= */
+
+app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
     service: "ClipAI"
   });
 });
 
-/* Upload video dari HP */
-app.post("/api/upload", upload.single("video"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({
-      error: "Video belum dipilih."
-    });
-  }
 
-  const id = crypto.randomUUID();
-  const ext = path.extname(req.file.originalname) || ".mp4";
-  const input = path.join(UPLOADS, id + ext);
+/* =========================
+   ANALYZE URL
+========================= */
 
-  fs.renameSync(req.file.path, input);
+app.post("/api/analyze-url", async (req, res) => {
 
-  res.json({
-    ok: true,
-    id,
-    filename: req.file.originalname,
-    input
-  });
-});
-/* URL video: direct MP4 + JKT48 Preset */
-app.post("/api/from-url", async (req, res) => {
   const { url } = req.body || {};
 
   if (!url) {
     return res.status(400).json({
-      error: "Link video belum diberikan."
+      error: "URL belum diberikan."
     });
   }
 
   try {
+
     const parsed = new URL(url);
 
     if (!["http:", "https:"].includes(parsed.protocol)) {
       throw new Error("URL tidak valid.");
     }
 
-    /* JKT48 Preset */
-    if (parsed.hostname === "jkt48.preset.id") {
-      const videoId = parsed.searchParams.get("v");
+    const host = parsed.hostname.toLowerCase();
 
-      if (!videoId) {
-        throw new Error("ID video JKT48 tidak ditemukan.");
+    /* YouTube */
+
+    if (
+      host === "youtube.com" ||
+      host === "www.youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "youtu.be"
+    ) {
+
+      const response = await fetch(
+        "https://www.youtube.com/oembed?url=" +
+        encodeURIComponent(url) +
+        "&format=json"
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Video YouTube tidak dapat dikenali."
+        );
       }
 
-      const apiUrl =
-        "https://jkt48.preset.id/api/video/" +
-        encodeURIComponent(videoId);
-
-      const apiResponse = await fetch(apiUrl);
-
-      if (!apiResponse.ok) {
-        throw new Error("Data video JKT48 tidak dapat diambil.");
-      }
-
-      const data = await apiResponse.json();
+      const data = await response.json();
 
       return res.json({
         ok: true,
-        source: "jkt48",
-        videoId,
-        data
+        source: "youtube",
+        title: data.title,
+        author: data.author_name,
+        thumbnail: data.thumbnail_url,
+        message:
+          "URL YouTube berhasil dikenali."
       });
     }
 
-    /* Direct video URL */
+
+    /* Direct video */
+
+    const response = await fetch(url, {
+      method: "HEAD"
+    });
+
+    const contentType =
+      response.headers.get("content-type") || "";
+
+    if (contentType.startsWith("video/")) {
+
+      return res.json({
+        ok: true,
+        source: "direct-video",
+        title: "Video",
+        message:
+          "URL video langsung berhasil dikenali."
+      });
+    }
+
+
+    throw new Error(
+      "URL belum didukung. Gunakan URL YouTube atau URL video langsung."
+    );
+
+  } catch (error) {
+
+    return res.status(400).json({
+      error:
+        error.message ||
+        "URL tidak dapat dianalisis."
+    });
+  }
+});
+
+
+/* =========================
+   DIRECT VIDEO URL
+========================= */
+
+app.post("/api/from-url", async (req, res) => {
+
+  const { url } = req.body || {};
+
+  if (!url) {
+    return res.status(400).json({
+      error: "URL video belum diberikan."
+    });
+  }
+
+  try {
+
+    const parsed = new URL(url);
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("URL tidak valid.");
+    }
+
     const id = crypto.randomUUID();
-    const output = path.join(UPLOADS, id + ".mp4");
+    const output = path.join(
+      UPLOADS,
+      id + ".mp4"
+    );
 
     const response = await fetch(url);
 
     if (!response.ok || !response.body) {
       throw new Error(
-        "Video tidak dapat diambil dari link tersebut."
+        "Video tidak dapat diambil dari URL."
       );
     }
 
     const contentType =
       response.headers.get("content-type") || "";
 
-    if (!contentType.includes("video")) {
+    if (!contentType.startsWith("video/")) {
       throw new Error(
-        "Link tersebut bukan file video langsung."
+        "URL tersebut bukan file video langsung."
       );
     }
 
-    const fileStream = fs.createWriteStream(output);
+    const stream =
+      fs.createWriteStream(output);
 
     for await (const chunk of response.body) {
-      fileStream.write(chunk);
+      stream.write(chunk);
     }
 
-    fileStream.end();
+    stream.end();
 
     await new Promise((resolve, reject) => {
-      fileStream.on("finish", resolve);
-      fileStream.on("error", reject);
+
+      stream.on("finish", resolve);
+      stream.on("error", reject);
+
     });
 
     res.json({
@@ -140,17 +204,70 @@ app.post("/api/from-url", async (req, res) => {
       input: output
     });
 
-  } catch (err) {
+  } catch (error) {
+
     res.status(400).json({
       error:
-        err.message ||
-        "Link video tidak dapat diproses."
+        error.message ||
+        "Video tidak dapat diambil."
     });
   }
 });
-/* Proses clip 9:16 */
+
+
+/* =========================
+   UPLOAD VIDEO
+========================= */
+
+app.post(
+  "/api/upload",
+  upload.single("video"),
+  (req, res) => {
+
+    if (!req.file) {
+      return res.status(400).json({
+        error: "Video belum dipilih."
+      });
+    }
+
+    const id = crypto.randomUUID();
+
+    const ext =
+      path.extname(
+        req.file.originalname
+      ) || ".mp4";
+
+    const input = path.join(
+      UPLOADS,
+      id + ext
+    );
+
+    fs.renameSync(
+      req.file.path,
+      input
+    );
+
+    res.json({
+      ok: true,
+      id,
+      input,
+      filename: req.file.originalname
+    });
+  }
+);
+
+
+/* =========================
+   CREATE CLIP
+========================= */
+
 app.post("/api/clip", (req, res) => {
-  const { input, start = 0, duration = 30 } = req.body || {};
+
+  const {
+    input,
+    start = 0,
+    duration = 30
+  } = req.body || {};
 
   if (!input || !fs.existsSync(input)) {
     return res.status(400).json({
@@ -158,77 +275,160 @@ app.post("/api/clip", (req, res) => {
     });
   }
 
-  const s = Math.max(0, Number(start) || 0);
-  const d = Math.min(
+  const startTime = Math.max(
+    0,
+    Number(start) || 0
+  );
+
+  const clipDuration = Math.min(
     120,
-    Math.max(1, Number(duration) || 30)
+    Math.max(
+      1,
+      Number(duration) || 30
+    )
   );
 
   const id = crypto.randomUUID();
-  const output = path.join(OUTPUTS, id + ".mp4");
 
-  const ffmpeg = process.env.FFMPEG_PATH || "ffmpeg";
+  const output = path.join(
+    OUTPUTS,
+    id + ".mp4"
+  );
+
+  const ffmpeg =
+    process.env.FFMPEG_PATH ||
+    "ffmpeg";
 
   const args = [
     "-y",
-    "-ss", String(s),
-    "-i", input,
-    "-t", String(d),
+
+    "-ss",
+    String(startTime),
+
+    "-i",
+    input,
+
+    "-t",
+    String(clipDuration),
+
     "-vf",
     "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
-    "-c:v", "libx264",
-    "-preset", "veryfast",
-    "-crf", "23",
-    "-c:a", "aac",
-    "-movflags", "+faststart",
+
+    "-c:v",
+    "libx264",
+
+    "-preset",
+    "veryfast",
+
+    "-crf",
+    "23",
+
+    "-c:a",
+    "aac",
+
+    "-movflags",
+    "+faststart",
+
     output
   ];
 
-  const process = spawn(ffmpeg, args);
+  const process = spawn(
+    ffmpeg,
+    args
+  );
 
   let errorText = "";
 
-  process.stderr.on("data", (data) => {
-    errorText += data.toString();
-  });
+  process.stderr.on(
+    "data",
+    data => {
+      errorText +=
+        data.toString();
+    }
+  );
 
-  process.on("close", (code) => {
-    if (code !== 0) {
-      return res.status(500).json({
-        error: "FFmpeg gagal.",
-        detail: errorText.slice(-1000)
+  process.on(
+    "close",
+    code => {
+
+      if (code !== 0) {
+
+        return res.status(500).json({
+          error: "FFmpeg gagal.",
+          detail:
+            errorText.slice(-1000)
+        });
+      }
+
+      res.json({
+        ok: true,
+        id,
+        url:
+          "/api/download/" +
+          id
       });
+
+    }
+  );
+});
+
+
+/* =========================
+   DOWNLOAD CLIP
+========================= */
+
+app.get(
+  "/api/download/:id",
+  (req, res) => {
+
+    const file = path.join(
+      OUTPUTS,
+      req.params.id + ".mp4"
+    );
+
+    if (!fs.existsSync(file)) {
+      return res.status(404).send(
+        "File tidak ditemukan."
+      );
     }
 
-    res.json({
-      ok: true,
-      id,
-      url: "/api/download/" + id
-    });
-  });
-});
-
-/* Download hasil */
-app.get("/api/download/:id", (req, res) => {
-  const file = path.join(
-    OUTPUTS,
-    req.params.id + ".mp4"
-  );
-
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("File tidak ditemukan");
+    res.download(
+      file,
+      "clipai-clip.mp4"
+    );
   }
+);
 
-  res.download(file, "clipai-clip.mp4");
-});
 
-/* Halaman utama */
-app.get("*splat", (_, res) => {
+/* =========================
+   FRONTEND
+========================= */
+
+app.get("*splat", (req, res) => {
+
   res.sendFile(
-    path.join(__dirname, "public", "index.html")
+    path.join(
+      __dirname,
+      "public",
+      "index.html"
+    )
   );
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("ClipAI running on port " + PORT);
-});
+
+/* =========================
+   START SERVER
+========================= */
+
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+
+    console.log(
+      "ClipAI running on port " +
+      PORT
+    );
+
+  }
+);
