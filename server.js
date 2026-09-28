@@ -1,52 +1,16 @@
 import express from "express";
-import multer from "multer";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { spawn } from "child_process";
-import crypto from "crypto";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-const DATA = path.join(__dirname, "data");
-const UPLOADS = path.join(DATA, "uploads");
-const OUTPUTS = path.join(DATA, "outputs");
-
-for (const dir of [DATA, UPLOADS, OUTPUTS]) {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-const upload = multer({
-  dest: UPLOADS,
-  limits: {
-    fileSize: 500 * 1024 * 1024
-  }
-});
-
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-
-/* =========================
-   HEALTH CHECK
-========================= */
+app.use(express.static("public"));
 
 app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
-    service: "ClipAI"
-  });
+  res.json({ ok: true, service: "ClipAI" });
 });
 
-
-/* =========================
-   ANALYZE URL
-========================= */
-
 app.post("/api/analyze-url", async (req, res) => {
-
   const { url } = req.body || {};
 
   if (!url) {
@@ -55,380 +19,164 @@ app.post("/api/analyze-url", async (req, res) => {
     });
   }
 
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(500).json({
+      error: "GEMINI_API_KEY belum dipasang di Railway."
+    });
+  }
+
   try {
-
     const parsed = new URL(url);
-
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      throw new Error("URL tidak valid.");
-    }
-
     const host = parsed.hostname.toLowerCase();
 
-    /* YouTube */
-
-    if (
+    const isYoutube =
       host === "youtube.com" ||
       host === "www.youtube.com" ||
       host === "m.youtube.com" ||
-      host === "youtu.be"
-    ) {
+      host === "youtu.be";
 
-      const response = await fetch(
-        "https://www.youtube.com/oembed?url=" +
-        encodeURIComponent(url) +
-        "&format=json"
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          "Video YouTube tidak dapat dikenali."
-        );
-      }
-
-      const data = await response.json();
-
-      return res.json({
-        ok: true,
-        source: "youtube",
-        title: data.title,
-        author: data.author_name,
-        thumbnail: data.thumbnail_url,
-        message:
-          "URL YouTube berhasil dikenali."
-      });
-    }
-
-
-    /* Direct video */
-
-    const response = await fetch(url, {
-      method: "HEAD"
-    });
-
-    const contentType =
-      response.headers.get("content-type") || "";
-
-    if (contentType.startsWith("video/")) {
-
-      return res.json({
-        ok: true,
-        source: "direct-video",
-        title: "Video",
-        message:
-          "URL video langsung berhasil dikenali."
-      });
-    }
-
-
-    throw new Error(
-      "URL belum didukung. Gunakan URL YouTube atau URL video langsung."
-    );
-
-  } catch (error) {
-
-    return res.status(400).json({
-      error:
-        error.message ||
-        "URL tidak dapat dianalisis."
-    });
-  }
-});
-
-
-/* =========================
-   DIRECT VIDEO URL
-========================= */
-
-app.post("/api/from-url", async (req, res) => {
-
-  const { url } = req.body || {};
-
-  if (!url) {
-    return res.status(400).json({
-      error: "URL video belum diberikan."
-    });
-  }
-
-  try {
-
-    const parsed = new URL(url);
-
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      throw new Error("URL tidak valid.");
-    }
-
-    const id = crypto.randomUUID();
-    const output = path.join(
-      UPLOADS,
-      id + ".mp4"
-    );
-
-    const response = await fetch(url);
-
-    if (!response.ok || !response.body) {
-      throw new Error(
-        "Video tidak dapat diambil dari URL."
-      );
-    }
-
-    const contentType =
-      response.headers.get("content-type") || "";
-
-    if (!contentType.startsWith("video/")) {
-      throw new Error(
-        "URL tersebut bukan file video langsung."
-      );
-    }
-
-    const stream =
-      fs.createWriteStream(output);
-
-    for await (const chunk of response.body) {
-      stream.write(chunk);
-    }
-
-    stream.end();
-
-    await new Promise((resolve, reject) => {
-
-      stream.on("finish", resolve);
-      stream.on("error", reject);
-
-    });
-
-    res.json({
-      ok: true,
-      source: "direct-video",
-      id,
-      input: output
-    });
-
-  } catch (error) {
-
-    res.status(400).json({
-      error:
-        error.message ||
-        "Video tidak dapat diambil."
-    });
-  }
-});
-
-
-/* =========================
-   UPLOAD VIDEO
-========================= */
-
-app.post(
-  "/api/upload",
-  upload.single("video"),
-  (req, res) => {
-
-    if (!req.file) {
+    if (!isYoutube) {
       return res.status(400).json({
-        error: "Video belum dipilih."
+        error: "Untuk sementara gunakan URL YouTube publik."
       });
     }
 
-    const id = crypto.randomUUID();
+    const prompt = `
+Kamu adalah mesin pencari momen video untuk ClipAI.
 
-    const ext =
-      path.extname(
-        req.file.originalname
-      ) || ".mp4";
+Analisis video YouTube yang diberikan.
 
-    const input = path.join(
-      UPLOADS,
-      id + ext
-    );
+Cari SEBANYAK MUNGKIN momen yang menarik, termasuk momen yang sangat kecil.
 
-    fs.renameSync(
-      req.file.path,
-      input
-    );
+Jangan hanya mencari momen utama.
 
-    res.json({
-      ok: true,
-      id,
-      input,
-      filename: req.file.originalname
-    });
-  }
-);
+Cari:
+- lucu
+- reaksi
+- cerita
+- emosi
+- kalimat menarik
+- informasi
+- fakta
+- pertanyaan
+- jawaban
+- pendapat
+- kejadian kecil
+- interaksi
+- kesalahan
+- kejutan
+- pernyataan kontroversial
+- bagian yang berpotensi membuat orang berhenti scrolling
+- bagian singkat tetapi menarik
 
+Target sekitar 10 sampai 20 momen atau lebih jika memang ada.
 
-/* =========================
-   CREATE CLIP
-========================= */
+Setiap momen harus mempunyai:
+title
+start
+end
+description
+reason
 
-app.post("/api/clip", (req, res) => {
+start dan end harus berupa timestamp seperti 00:12 atau 01:25.
 
-  const {
-    input,
-    start = 0,
-    duration = 30
-  } = req.body || {};
+PENTING:
+- Gunakan timestamp yang benar-benar berasal dari video.
+- Jangan mengarang timestamp.
+- Jangan membuat momen fiktif.
+- Urutkan berdasarkan waktu kemunculannya.
+- Jika sebuah momen kecil hanya berlangsung beberapa detik, tetap masukkan.
+- Jangan membuat clip atau video.
+- Hanya lakukan analisis.
 
-  if (!input || !fs.existsSync(input)) {
-    return res.status(400).json({
-      error: "File video tidak ditemukan."
-    });
-  }
+Balas HANYA JSON dengan format:
 
-  const startTime = Math.max(
-    0,
-    Number(start) || 0
-  );
-
-  const clipDuration = Math.min(
-    120,
-    Math.max(
-      1,
-      Number(duration) || 30
-    )
-  );
-
-  const id = crypto.randomUUID();
-
-  const output = path.join(
-    OUTPUTS,
-    id + ".mp4"
-  );
-
-  const ffmpeg =
-    process.env.FFMPEG_PATH ||
-    "ffmpeg";
-
-  const args = [
-    "-y",
-
-    "-ss",
-    String(startTime),
-
-    "-i",
-    input,
-
-    "-t",
-    String(clipDuration),
-
-    "-vf",
-    "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
-
-    "-c:v",
-    "libx264",
-
-    "-preset",
-    "veryfast",
-
-    "-crf",
-    "23",
-
-    "-c:a",
-    "aac",
-
-    "-movflags",
-    "+faststart",
-
-    output
-  ];
-
-  const process = spawn(
-    ffmpeg,
-    args
-  );
-
-  let errorText = "";
-
-  process.stderr.on(
-    "data",
-    data => {
-      errorText +=
-        data.toString();
+{
+  "moments": [
+    {
+      "title": "Judul momen",
+      "start": "00:00",
+      "end": "00:30",
+      "description": "Apa yang terjadi",
+      "reason": "Kenapa bagian ini menarik"
     }
-  );
+  ]
+}
+`;
 
-  process.on(
-    "close",
-    code => {
-
-      if (code !== 0) {
-
-        return res.status(500).json({
-          error: "FFmpeg gagal.",
-          detail:
-            errorText.slice(-1000)
-        });
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": process.env.GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  file_data: {
+                    file_uri: url
+                  }
+                },
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        })
       }
+    );
 
-      res.json({
-        ok: true,
-        id,
-        url:
-          "/api/download/" +
-          id
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error(data);
+
+      return res.status(500).json({
+        error:
+          data?.error?.message ||
+          "Gemini gagal menganalisis video."
       });
-
-    }
-  );
-});
-
-
-/* =========================
-   DOWNLOAD CLIP
-========================= */
-
-app.get(
-  "/api/download/:id",
-  (req, res) => {
-
-    const file = path.join(
-      OUTPUTS,
-      req.params.id + ".mp4"
-    );
-
-    if (!fs.existsSync(file)) {
-      return res.status(404).send(
-        "File tidak ditemukan."
-      );
     }
 
-    res.download(
-      file,
-      "clipai-clip.mp4"
-    );
+    const text =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      return res.status(500).json({
+        error: "Gemini tidak memberikan hasil."
+      });
+    }
+
+    const result = JSON.parse(text);
+
+    return res.json({
+      ok: true,
+      moments: result.moments || []
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      error:
+        error.message ||
+        "Video gagal dianalisis."
+    });
   }
-);
-
-
-/* =========================
-   FRONTEND
-========================= */
+});
 
 app.get("*splat", (req, res) => {
-
-  res.sendFile(
-    path.join(
-      __dirname,
-      "public",
-      "index.html"
-    )
-  );
+  res.sendFile(process.cwd() + "/public/index.html");
 });
 
-
-/* =========================
-   START SERVER
-========================= */
-
-app.listen(
-  PORT,
-  "0.0.0.0",
-  () => {
-
-    console.log(
-      "ClipAI running on port " +
-      PORT
-    );
-
-  }
-);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("ClipAI running on port " + PORT);
+});
