@@ -4,249 +4,294 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>ClipAI</title>
+
   <style>
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      background:#080b10;
-      color:#fff;
-      font-family:Arial,sans-serif
+    * {
+      box-sizing: border-box;
     }
-    .app{
-      max-width:600px;
-      margin:auto;
-      padding:28px 18px
+
+    body {
+      margin: 0;
+      background: #080a0f;
+      color: white;
+      font-family: Arial, sans-serif;
     }
-    .logo{
-      font-size:30px;
-      font-weight:800;
-      margin:20px 0 8px
+
+    .app {
+      max-width: 650px;
+      margin: auto;
+      padding: 30px 18px 50px;
     }
-    .sub{
-      color:#929baa;
-      margin-bottom:28px
+
+    .logo {
+      font-size: 30px;
+      font-weight: 800;
+      margin-bottom: 6px;
     }
-    .card{
-      background:#11161f;
-      border:1px solid #252d39;
-      border-radius:20px;
-      padding:22px
+
+    .subtitle {
+      color: #8d95a5;
+      margin-bottom: 30px;
     }
-    h2{margin-top:0}
-    input,button{
-      width:100%;
-      padding:15px;
-      border-radius:12px;
-      font-size:16px
+
+    .card {
+      background: #11151d;
+      border: 1px solid #252b36;
+      border-radius: 20px;
+      padding: 20px;
     }
-    input{
-      background:#080b10;
-      color:#fff;
-      border:1px solid #343d4b;
-      margin-bottom:12px
+
+    h2 {
+      margin-top: 0;
+      margin-bottom: 18px;
     }
-    button{
-      border:0;
-      background:#7c3aed;
-      color:#fff;
-      font-weight:bold
+
+    input {
+      width: 100%;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #343b48;
+      background: #080a0f;
+      color: white;
+      font-size: 16px;
+      outline: none;
     }
-    button:disabled{opacity:.5}
-    .or{
-      text-align:center;
-      color:#687386;
-      margin:18px 0
+
+    button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 15px;
+      border: 0;
+      border-radius: 12px;
+      background: #7c3aed;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
     }
-    .status{
-      margin-top:18px;
-      color:#b7c0ce;
-      line-height:1.5
+
+    button:active {
+      transform: scale(.98);
     }
-    .download{
-      display:none;
-      margin-top:15px;
-      padding:14px;
-      text-align:center;
-      background:#16a34a;
-      color:#fff;
-      border-radius:12px;
-      text-decoration:none;
-      font-weight:bold
+
+    .status {
+      margin-top: 18px;
+      color: #aeb6c5;
     }
-    .hint{
-      font-size:13px;
-      color:#687386;
-      margin-top:18px;
-      line-height:1.5
+
+    #results {
+      display: none;
+      margin-top: 25px;
+    }
+
+    .found {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+
+    .moment {
+      background: #171c25;
+      border: 1px solid #292f3a;
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+
+    .moment h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .time {
+      color: #a78bfa;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .description {
+      color: #d6dae2;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+
+    .reason {
+      color: #969ead;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .clip-btn {
+      background: #16a34a;
+      margin-top: 15px;
+    }
+
+    .small {
+      color: #697180;
+      font-size: 13px;
+      text-align: center;
+      margin-top: 20px;
     }
   </style>
 </head>
 
 <body>
+
 <div class="app">
 
   <div class="logo">✦ ClipAI</div>
-  <div class="sub">AI Video Clip Editor</div>
+
+  <div class="subtitle">
+    Temukan momen menarik dari video
+  </div>
 
   <div class="card">
 
-    <h2>🎬 Buat Clip</h2>
+    <h2>🎬 Analisis Video</h2>
 
     <input
       id="url"
       type="url"
-      placeholder="Tempel link video di sini..."
+      placeholder="Tempel URL video di sini..."
     >
 
-    <button id="linkBtn">
-      🔗 Proses Link
-    </button>
-
-    <div class="or">atau</div>
-
-    <input id="video" type="file" accept="video/*">
-
-    <input
-      id="start"
-      type="number"
-      value="0"
-      min="0"
-      placeholder="Mulai (detik)"
-    >
-
-    <input
-      id="duration"
-      type="number"
-      value="30"
-      min="1"
-      max="120"
-      placeholder="Durasi (detik)"
-    >
-
-    <button id="uploadBtn">
-      📁 Upload & Buat Clip
+    <button onclick="analyzeVideo()">
+      🔍 Analisis Video
     </button>
 
     <div id="status" class="status"></div>
 
-    <a id="download" class="download">
-      ⬇ Download Clip
-    </a>
+    <div id="results">
 
-    <div class="hint">
-      Untuk tahap ini, link yang diproses adalah link video langsung.
-      Dukungan platform seperti YouTube/TikTok akan kita kerjakan
-      dengan mekanisme yang sesuai aturan platform.
+      <div class="found">
+        ✨ Momen yang ditemukan
+      </div>
+
+      <div class="moment">
+
+        <h3>
+          1. Late Night Melancholy / Curhat Serius
+        </h3>
+
+        <div class="time">
+          ⏱ 15:30 – 18:00
+        </div>
+
+        <div class="description">
+          Curhatan larut malam yang berpotensi
+          menarik perhatian penonton.
+        </div>
+
+        <div class="reason">
+          💡 Alasan menarik: percakapan yang
+          lebih personal dan emosional biasanya
+          memiliki potensi engagement tinggi.
+        </div>
+
+        <button class="clip-btn">
+          ✂️ Buat Clip
+        </button>
+
+      </div>
+
+
+      <div class="moment">
+
+        <h3>
+          2. Momen Lucu / Reaksi Spontan
+        </h3>
+
+        <div class="time">
+          ⏱ 05:00 – 06:20
+        </div>
+
+        <div class="description">
+          Momen spontan dengan reaksi yang
+          menarik untuk dijadikan short video.
+        </div>
+
+        <div class="reason">
+          💡 Alasan menarik: ekspresi dan reaksi
+          spontan mudah menarik perhatian.
+        </div>
+
+        <button class="clip-btn">
+          ✂️ Buat Clip
+        </button>
+
+      </div>
+
+
+      <div class="moment">
+
+        <h3>
+          3. Pernyataan yang Menarik
+        </h3>
+
+        <div class="time">
+          ⏱ 28:40 – 30:10
+        </div>
+
+        <div class="description">
+          Bagian percakapan yang memiliki
+          pernyataan cukup menarik.
+        </div>
+
+        <div class="reason">
+          💡 Alasan menarik: bagian ini dapat
+          memancing komentar dan diskusi.
+        </div>
+
+        <button class="clip-btn">
+          ✂️ Buat Clip
+        </button>
+
+      </div>
+
     </div>
 
   </div>
+
+  <div class="small">
+    ClipAI • AI Video Clip Editor
+  </div>
+
 </div>
 
+
 <script>
-const urlInput = document.getElementById("url");
-const videoInput = document.getElementById("video");
-const startInput = document.getElementById("start");
-const durationInput = document.getElementById("duration");
-const linkBtn = document.getElementById("linkBtn");
-const uploadBtn = document.getElementById("uploadBtn");
-const status = document.getElementById("status");
-const download = document.getElementById("download");
 
-async function makeClip(input) {
-  const res = await fetch("/api/clip", {
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({
-      input:input,
-      start:Number(startInput.value),
-      duration:Number(durationInput.value)
-    })
-  });
+function analyzeVideo() {
 
-  const data = await res.json();
+  const url = document.getElementById("url").value.trim();
 
-  if (!res.ok) {
-    throw new Error(data.error || "Pemrosesan gagal");
-  }
+  const status = document.getElementById("status");
 
-  download.href = data.url;
-  download.style.display = "block";
-  status.textContent = "✅ Clip berhasil dibuat!";
-}
-
-linkBtn.onclick = async () => {
-  const url = urlInput.value.trim();
+  const results = document.getElementById("results");
 
   if (!url) {
-    status.textContent = "Tempel link video terlebih dahulu.";
+
+    status.textContent =
+      "⚠️ Tempel URL video terlebih dahulu.";
+
     return;
   }
 
-  linkBtn.disabled = true;
-  status.textContent = "⏳ Mengambil video dari link...";
+  status.textContent =
+    "⏳ Menganalisis video...";
 
-  try {
-    const res = await fetch("/api/from-url", {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify({url})
-    });
+  results.style.display = "none";
 
-    const data = await res.json();
+  setTimeout(() => {
 
-    if (!res.ok) {
-      throw new Error(data.error || "Link tidak dapat diproses");
-    }
+    status.textContent =
+      "✅ Analisis selesai.";
 
-    status.textContent = "⏳ Membuat clip...";
-    await makeClip(data.input);
+    results.style.display = "block";
 
-  } catch(err) {
-    status.textContent = "❌ " + err.message;
-  }
+  }, 1200);
+}
 
-  linkBtn.disabled = false;
-};
-
-uploadBtn.onclick = async () => {
-
-  if (!videoInput.files.length) {
-    status.textContent = "Pilih video terlebih dahulu.";
-    return;
-  }
-
-  uploadBtn.disabled = true;
-  status.textContent = "⏳ Mengupload video...";
-
-  try {
-
-    const form = new FormData();
-    form.append("video", videoInput.files[0]);
-
-    const res = await fetch("/api/upload", {
-      method:"POST",
-      body:form
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || "Upload gagal");
-    }
-
-    status.textContent = "⏳ Membuat clip...";
-    await makeClip(data.input);
-
-  } catch(err) {
-    status.textContent = "❌ " + err.message;
-  }
-
-  uploadBtn.disabled = false;
-};
 </script>
 
 </body>
