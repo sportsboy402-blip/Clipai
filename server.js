@@ -54,6 +54,7 @@ app.post("/api/upload", upload.single("video"), (req, res) => {
     input
   });
 });
+/* URL video: direct MP4 + JKT48 Preset */
 app.post("/api/from-url", async (req, res) => {
   const { url } = req.body || {};
 
@@ -70,13 +71,53 @@ app.post("/api/from-url", async (req, res) => {
       throw new Error("URL tidak valid.");
     }
 
+    /* JKT48 Preset */
+    if (parsed.hostname === "jkt48.preset.id") {
+      const videoId = parsed.searchParams.get("v");
+
+      if (!videoId) {
+        throw new Error("ID video JKT48 tidak ditemukan.");
+      }
+
+      const apiUrl =
+        "https://jkt48.preset.id/api/video/" +
+        encodeURIComponent(videoId);
+
+      const apiResponse = await fetch(apiUrl);
+
+      if (!apiResponse.ok) {
+        throw new Error("Data video JKT48 tidak dapat diambil.");
+      }
+
+      const data = await apiResponse.json();
+
+      return res.json({
+        ok: true,
+        source: "jkt48",
+        videoId,
+        data
+      });
+    }
+
+    /* Direct video URL */
     const id = crypto.randomUUID();
     const output = path.join(UPLOADS, id + ".mp4");
 
     const response = await fetch(url);
 
     if (!response.ok || !response.body) {
-      throw new Error("Video tidak dapat diambil dari link tersebut.");
+      throw new Error(
+        "Video tidak dapat diambil dari link tersebut."
+      );
+    }
+
+    const contentType =
+      response.headers.get("content-type") || "";
+
+    if (!contentType.includes("video")) {
+      throw new Error(
+        "Link tersebut bukan file video langsung."
+      );
     }
 
     const fileStream = fs.createWriteStream(output);
@@ -94,13 +135,16 @@ app.post("/api/from-url", async (req, res) => {
 
     res.json({
       ok: true,
+      source: "direct-video",
       id,
       input: output
     });
 
   } catch (err) {
     res.status(400).json({
-      error: err.message || "Link video tidak dapat diproses."
+      error:
+        err.message ||
+        "Link video tidak dapat diproses."
     });
   }
 });
