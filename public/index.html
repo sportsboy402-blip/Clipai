@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ClipAI</title>
+  <style>
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial,sans-serif;
+      background:#080b10;
+      color:#fff;
+      min-height:100vh;
+      display:flex;
+      justify-content:center;
+    }
+    .app{width:100%;max-width:600px;padding:28px 18px}
+    .logo{font-size:30px;font-weight:800;margin:20px 0 8px}
+    .sub{color:#8d96a5;margin-bottom:30px}
+    .card{
+      background:#11161f;
+      border:1px solid #252d39;
+      border-radius:20px;
+      padding:22px;
+    }
+    input,button{
+      width:100%;
+      padding:15px;
+      border-radius:12px;
+      font-size:16px;
+    }
+    input{
+      background:#080b10;
+      color:white;
+      border:1px solid #343d4b;
+      margin-bottom:12px;
+    }
+    button{
+      border:0;
+      background:#7c3aed;
+      color:white;
+      font-weight:bold;
+      cursor:pointer;
+    }
+    button:disabled{opacity:.5}
+    .or{text-align:center;color:#697386;margin:16px 0}
+    .status{margin-top:18px;color:#aeb7c5;line-height:1.5}
+    .download{
+      display:none;
+      margin-top:15px;
+      text-align:center;
+      background:#16a34a;
+      padding:14px;
+      border-radius:12px;
+      color:white;
+      text-decoration:none;
+      font-weight:bold;
+    }
+    .small{font-size:13px;color:#687386;margin-top:18px}
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <div class="logo">✦ ClipAI</div>
+  <div class="sub">AI Video Clip Editor</div>
+
+  <div class="card">
+    <h2>Ubah video menjadi clip</h2>
+    <p class="sub">Upload video untuk membuat clip 9:16.</p>
+
+    <input id="video" type="file" accept="video/*">
+
+    <input id="start" type="number" value="0" min="0" placeholder="Mulai (detik)">
+
+    <input id="duration" type="number" value="15" min="1" placeholder="Durasi (detik)">
+
+    <button id="process">Buat Clip</button>
+
+    <div id="status" class="status"></div>
+
+    <a id="download" class="download">⬇ Download Clip</a>
+
+    <div class="small">
+      Versi awal ClipAI. Pemrosesan video dilakukan di server.
+    </div>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById("video");
+const start = document.getElementById("start");
+const duration = document.getElementById("duration");
+const processBtn = document.getElementById("process");
+const status = document.getElementById("status");
+const download = document.getElementById("download");
+
+processBtn.onclick = async () => {
+  if (!video.files.length) {
+    status.textContent = "Pilih video terlebih dahulu.";
+    return;
+  }
+
+  processBtn.disabled = true;
+  download.style.display = "none";
+  status.textContent = "Mengupload video...";
+
+  try {
+    const form = new FormData();
+    form.append("video", video.files[0]);
+
+    const uploadRes = await fetch("/api/upload", {
+      method: "POST",
+      body: form
+    });
+
+    if (!uploadRes.ok) throw new Error("Upload gagal");
+
+    const uploaded = await uploadRes.json();
+
+    status.textContent = "Sedang membuat clip...";
+
+    const clipRes = await fetch("/api/clip", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        id: uploaded.id,
+        start: Number(start.value),
+        duration: Number(duration.value)
+      })
+    });
+
+    if (!clipRes.ok) throw new Error("Pemrosesan gagal");
+
+    const result = await clipRes.json();
+
+    status.textContent = "Clip berhasil dibuat!";
+
+    download.href = "/api/download/" + result.id;
+    download.style.display = "block";
+
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
+  }
+
+  processBtn.disabled = false;
+};
+</script>
+</body>
+    </html>
