@@ -8,144 +8,246 @@
     *{box-sizing:border-box}
     body{
       margin:0;
-      font-family:Arial,sans-serif;
       background:#080b10;
       color:#fff;
-      min-height:100vh;
-      display:flex;
-      justify-content:center;
+      font-family:Arial,sans-serif
     }
-    .app{width:100%;max-width:600px;padding:28px 18px}
-    .logo{font-size:30px;font-weight:800;margin:20px 0 8px}
-    .sub{color:#8d96a5;margin-bottom:30px}
+    .app{
+      max-width:600px;
+      margin:auto;
+      padding:28px 18px
+    }
+    .logo{
+      font-size:30px;
+      font-weight:800;
+      margin:20px 0 8px
+    }
+    .sub{
+      color:#929baa;
+      margin-bottom:28px
+    }
     .card{
       background:#11161f;
       border:1px solid #252d39;
       border-radius:20px;
-      padding:22px;
+      padding:22px
     }
+    h2{margin-top:0}
     input,button{
       width:100%;
       padding:15px;
       border-radius:12px;
-      font-size:16px;
+      font-size:16px
     }
     input{
       background:#080b10;
-      color:white;
+      color:#fff;
       border:1px solid #343d4b;
-      margin-bottom:12px;
+      margin-bottom:12px
     }
     button{
       border:0;
       background:#7c3aed;
-      color:white;
-      font-weight:bold;
-      cursor:pointer;
+      color:#fff;
+      font-weight:bold
     }
     button:disabled{opacity:.5}
-    .or{text-align:center;color:#697386;margin:16px 0}
-    .status{margin-top:18px;color:#aeb7c5;line-height:1.5}
+    .or{
+      text-align:center;
+      color:#687386;
+      margin:18px 0
+    }
+    .status{
+      margin-top:18px;
+      color:#b7c0ce;
+      line-height:1.5
+    }
     .download{
       display:none;
       margin-top:15px;
+      padding:14px;
       text-align:center;
       background:#16a34a;
-      padding:14px;
+      color:#fff;
       border-radius:12px;
-      color:white;
       text-decoration:none;
-      font-weight:bold;
+      font-weight:bold
     }
-    .small{font-size:13px;color:#687386;margin-top:18px}
+    .hint{
+      font-size:13px;
+      color:#687386;
+      margin-top:18px;
+      line-height:1.5
+    }
   </style>
 </head>
 
 <body>
 <div class="app">
+
   <div class="logo">✦ ClipAI</div>
   <div class="sub">AI Video Clip Editor</div>
 
   <div class="card">
-    <h2>Ubah video menjadi clip</h2>
-    <p class="sub">Upload video untuk membuat clip 9:16.</p>
+
+    <h2>🎬 Buat Clip</h2>
+
+    <input
+      id="url"
+      type="url"
+      placeholder="Tempel link video di sini..."
+    >
+
+    <button id="linkBtn">
+      🔗 Proses Link
+    </button>
+
+    <div class="or">atau</div>
 
     <input id="video" type="file" accept="video/*">
 
-    <input id="start" type="number" value="0" min="0" placeholder="Mulai (detik)">
+    <input
+      id="start"
+      type="number"
+      value="0"
+      min="0"
+      placeholder="Mulai (detik)"
+    >
 
-    <input id="duration" type="number" value="15" min="1" placeholder="Durasi (detik)">
+    <input
+      id="duration"
+      type="number"
+      value="30"
+      min="1"
+      max="120"
+      placeholder="Durasi (detik)"
+    >
 
-    <button id="process">Buat Clip</button>
+    <button id="uploadBtn">
+      📁 Upload & Buat Clip
+    </button>
 
     <div id="status" class="status"></div>
 
-    <a id="download" class="download">⬇ Download Clip</a>
+    <a id="download" class="download">
+      ⬇ Download Clip
+    </a>
 
-    <div class="small">
-      Versi awal ClipAI. Pemrosesan video dilakukan di server.
+    <div class="hint">
+      Untuk tahap ini, link yang diproses adalah link video langsung.
+      Dukungan platform seperti YouTube/TikTok akan kita kerjakan
+      dengan mekanisme yang sesuai aturan platform.
     </div>
+
   </div>
 </div>
 
 <script>
-const video = document.getElementById("video");
-const start = document.getElementById("start");
-const duration = document.getElementById("duration");
-const processBtn = document.getElementById("process");
+const urlInput = document.getElementById("url");
+const videoInput = document.getElementById("video");
+const startInput = document.getElementById("start");
+const durationInput = document.getElementById("duration");
+const linkBtn = document.getElementById("linkBtn");
+const uploadBtn = document.getElementById("uploadBtn");
 const status = document.getElementById("status");
 const download = document.getElementById("download");
 
-processBtn.onclick = async () => {
-  if (!video.files.length) {
+async function makeClip(input) {
+  const res = await fetch("/api/clip", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      input:input,
+      start:Number(startInput.value),
+      duration:Number(durationInput.value)
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || "Pemrosesan gagal");
+  }
+
+  download.href = data.url;
+  download.style.display = "block";
+  status.textContent = "✅ Clip berhasil dibuat!";
+}
+
+linkBtn.onclick = async () => {
+  const url = urlInput.value.trim();
+
+  if (!url) {
+    status.textContent = "Tempel link video terlebih dahulu.";
+    return;
+  }
+
+  linkBtn.disabled = true;
+  status.textContent = "⏳ Mengambil video dari link...";
+
+  try {
+    const res = await fetch("/api/from-url", {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({url})
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Link tidak dapat diproses");
+    }
+
+    status.textContent = "⏳ Membuat clip...";
+    await makeClip(data.input);
+
+  } catch(err) {
+    status.textContent = "❌ " + err.message;
+  }
+
+  linkBtn.disabled = false;
+};
+
+uploadBtn.onclick = async () => {
+
+  if (!videoInput.files.length) {
     status.textContent = "Pilih video terlebih dahulu.";
     return;
   }
 
-  processBtn.disabled = true;
-  download.style.display = "none";
-  status.textContent = "Mengupload video...";
+  uploadBtn.disabled = true;
+  status.textContent = "⏳ Mengupload video...";
 
   try {
+
     const form = new FormData();
-    form.append("video", video.files[0]);
+    form.append("video", videoInput.files[0]);
 
-    const uploadRes = await fetch("/api/upload", {
-      method: "POST",
-      body: form
+    const res = await fetch("/api/upload", {
+      method:"POST",
+      body:form
     });
 
-    if (!uploadRes.ok) throw new Error("Upload gagal");
+    const data = await res.json();
 
-    const uploaded = await uploadRes.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Upload gagal");
+    }
 
-    status.textContent = "Sedang membuat clip...";
+    status.textContent = "⏳ Membuat clip...";
+    await makeClip(data.input);
 
-    const clipRes = await fetch("/api/clip", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        id: uploaded.id,
-        start: Number(start.value),
-        duration: Number(duration.value)
-      })
-    });
-
-    if (!clipRes.ok) throw new Error("Pemrosesan gagal");
-
-    const result = await clipRes.json();
-
-    status.textContent = "Clip berhasil dibuat!";
-
-    download.href = "/api/download/" + result.id;
-    download.style.display = "block";
-
-  } catch (err) {
-    status.textContent = "Error: " + err.message;
+  } catch(err) {
+    status.textContent = "❌ " + err.message;
   }
 
-  processBtn.disabled = false;
+  uploadBtn.disabled = false;
 };
 </script>
+
 </body>
-    </html>
+</html>
