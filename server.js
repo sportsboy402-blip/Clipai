@@ -54,7 +54,56 @@ app.post("/api/upload", upload.single("video"), (req, res) => {
     input
   });
 });
+app.post("/api/from-url", async (req, res) => {
+  const { url } = req.body || {};
 
+  if (!url) {
+    return res.status(400).json({
+      error: "Link video belum diberikan."
+    });
+  }
+
+  try {
+    const parsed = new URL(url);
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("URL tidak valid.");
+    }
+
+    const id = crypto.randomUUID();
+    const output = path.join(UPLOADS, id + ".mp4");
+
+    const response = await fetch(url);
+
+    if (!response.ok || !response.body) {
+      throw new Error("Video tidak dapat diambil dari link tersebut.");
+    }
+
+    const fileStream = fs.createWriteStream(output);
+
+    for await (const chunk of response.body) {
+      fileStream.write(chunk);
+    }
+
+    fileStream.end();
+
+    await new Promise((resolve, reject) => {
+      fileStream.on("finish", resolve);
+      fileStream.on("error", reject);
+    });
+
+    res.json({
+      ok: true,
+      id,
+      input: output
+    });
+
+  } catch (err) {
+    res.status(400).json({
+      error: err.message || "Link video tidak dapat diproses."
+    });
+  }
+});
 /* Proses clip 9:16 */
 app.post("/api/clip", (req, res) => {
   const { input, start = 0, duration = 30 } = req.body || {};
